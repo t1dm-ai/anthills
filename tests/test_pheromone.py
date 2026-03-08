@@ -2,10 +2,7 @@
 Basic tests for PheromoneBoard.
 """
 
-import sys
-sys.path.insert(0, '..')
-
-from stigmergy import PheromoneBoard
+from anthills import PheromoneBoard
 
 
 def test_deposit_and_read():
