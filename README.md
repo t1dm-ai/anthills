@@ -30,20 +30,46 @@ All coordinating like an ant colony.
 - **Simple:** Each agent is dumb; intelligence emerges
 - **Transparent:** You can see what agents are sensing/doing
 
+## Install
+
+**Via PyPI (recommended):**
+
+```bash
+pip install anthills
+```
+
+**From source:**
+
+```bash
+git clone https://github.com/dbrasuell/anthills
+cd anthills
+pip install -e .
+```
+
 ## Quick Start
 
 ```bash
-pip install -r requirements.txt
 export ANTHROPIC_API_KEY="sk-..."
-python examples/research_agents.py
+python -m examples.research_agents
+```
+
+Or run the T1D simulation:
+
+```bash
+python -m examples.t1d_simulation
 ```
 
 ## How It Works
 
 ### The Pheromone Board
+
 Shared memory where agents leave traces:
+
 ```python
-pheromone.deposit("research", {
+from anthills import PheromoneBoard
+
+board = PheromoneBoard()
+board.deposit("research", {
     "topic": "LLM reasoning",
     "findings": ["extended thinking works", "costs are high"],
     "source": "agent_research"
@@ -51,13 +77,13 @@ pheromone.deposit("research", {
 ```
 
 ### Agent Loop
+
 ```python
-agent = Agent(name="researcher", tools=[web_search, read_file])
-while not done:
-    traces = pheromone.read("research")  # Perceive
-    next_action = agent.think(traces)     # Think
-    result = agent.act(next_action)       # Act
-    pheromone.deposit("research", result) # Leave trace
+from anthills import Agent
+
+agent = Agent(name="researcher", goal="Research X", pheromone_board=board)
+while not agent.completed:
+    agent.step()  # perceive → think → act → deposit
 ```
 
 ### Example: Two Agents, No Explicit Messaging
@@ -80,9 +106,11 @@ No message passing. No protocol. Just traces in the environment.
 ## Examples
 
 - **`research_agents.py`** — Two agents researching a topic together
-- **`t1d_simulation.py`** — Type 1 Diabetes pathophysiology model (see below)
+- **`t1d_simulation.py`** — Type 1 Diabetes pathophysiology model
 - **`debug_agents.py`** — Three agents debugging code collaboratively
 - **`build_agents.py`** — Agents building a feature end-to-end
+
+See `examples/` directory and `examples/T1D_README.md` for details.
 
 ## Real-World Application: Type 1 Diabetes Simulation
 
@@ -109,7 +137,7 @@ BetaCells ↔ ImmuneSystem (no direct messaging)
 ### Run the Simulation
 
 ```bash
-python examples/t1d_simulation.py
+python -m examples.t1d_simulation
 ```
 
 This runs two scenarios:
@@ -118,24 +146,30 @@ This runs two scenarios:
 
 The output shows day-by-day progression of glucose, insulin, inflammation, and beta cell count.
 
+See `examples/T1D_README.md` for full details.
+
 ## Project Structure
 
 ```
 anthills/
 ├── README.md
-├── requirements.txt
+├── pyproject.toml
 ├── anthills/
 │   ├── __init__.py
-│   ├── agent.py           # Base Agent class
-│   ├── pheromone.py       # Shared environment
-│   ├── tools.py           # Tool definitions
-│   └── llm.py             # Claude integration
+│   ├── agent.py              # Base Agent class
+│   ├── pheromone.py          # Shared environment
+│   ├── tools.py              # Tool definitions
+│   ├── llm.py                # Claude integration
+│   └── environments/
+│       ├── __init__.py
+│       └── t1d.py            # T1D simulation
 ├── examples/
 │   ├── research_agents.py
+│   ├── t1d_simulation.py
 │   ├── debug_agents.py
-│   └── build_agents.py
+│   └── T1D_README.md
 └── tests/
-    └── test_agent.py
+    └── test_pheromone.py
 ```
 
 ## Philosophy
@@ -150,11 +184,14 @@ Use it when you want:
 
 ## Roadmap
 
-- [ ] Multi-pheromone types (strength, TTL, priority)
-- [ ] Agent memory (persistent traces)
-- [ ] Visualization (see the pheromone board in real-time)
-- [ ] Streaming agent responses
-- [ ] More tools (code execution, file I/O, external APIs)
+- [ ] Real-time dashboard (visualize pheromone board)
+- [ ] Agent profiler (performance metrics)
+- [ ] Trace debugger (replay decisions step-by-step)
+- [ ] More environments (stock market, code debugging, research)
+- [ ] Parallel agent execution
+- [ ] Browser automation tools
+- [ ] Database access tools
+- [ ] Webhooks / external event triggers
 
 ## Building This in Public
 
@@ -164,4 +201,6 @@ Daily updates on architecture, insights, and use cases.
 
 ---
 
-**Built with Claude + Python + Anthills vibes 🐜**
+**Built with Claude + Python. Inspired by ant colonies. 🐜**
+
+[Read the full documentation](./examples/T1D_README.md) | [View on PyPI](https://pypi.org/project/anthills/)
