@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "anthills"
-version = "0.1.0"
+version = "0.1.1"
 description = "Multi-agent coordination through stigmergy - agents coordinate via environmental traces, not explicit messaging"
 readme = "README.md"
 license = {text = "MIT"}
