@@ -1,3 +1,22 @@
-anthropic>=0.25.0
-requests>=2.31.0
-python-dotenv>=1.0.0
+# Core dependencies (none required - zero deps by default)
+
+# Optional: For Claude/LLM integration
+# anthropic>=0.40.0
+
+# Optional: For Gmail connector  
+# google-api-python-client>=2.0.0
+# google-auth>=2.0.0
+
+# Optional: For Slack connector
+# slack-sdk>=3.0.0
+
+# Development
+# pytest>=7.0.0
+# pytest-asyncio>=0.21.0
+# pytest-cov>=4.0.0
+
+# Install with optional extras:
+#   pip install anthills[claude]      # Claude integration
+#   pip install anthills[gmail]       # Gmail connector
+#   pip install anthills[slack]       # Slack connector
+#   pip install anthills[dev]         # Development tools

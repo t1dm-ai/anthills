@@ -1,176 +1,287 @@
 # Anthills 🐜
 
-**Multi-agent coordination without explicit messaging.**
+> **Stigmergy-based AI agent orchestration.** Agents coordinate through a shared environment — not a central planner.
 
-Inspired by ant colonies, where simple agents leave chemical trails (pheromones) that other agents sense and respond to — creating emergent swarm intelligence.
+[![PyPI version](https://badge.fury.io/py/anthills.svg)](https://pypi.org/project/anthills/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
-## The Idea
+---
 
-Most multi-agent frameworks require explicit coordination: Agent A tells Agent B what to do. Message passing. Explicit protocols.
+## What is Anthills?
 
-**Anthills does the opposite.** Agents:
-1. **Perceive** the shared environment (pheromone board)
-2. **Think** independently using Claude
-3. **Act** on the environment (call tools)
-4. **Leave traces** for other agents to sense
+Most agent frameworks orchestrate through a central controller — a graph, a DAG, a router that decides who does what next.
 
-No explicit messaging. No central coordinator. Just local behavior creating emergent coordination.
+**Anthills is different.** It borrows from nature.
 
-```
-Agent A finds research → leaves trace
-Agent B senses trace → builds on it
-Agent C senses both → generates code
-All coordinating like an ant colony.
-```
+In an ant colony, no single ant knows the plan. Instead, ants deposit *pheromones* — signals in the environment — and other ants respond to those signals. Complex, adaptive behavior emerges from simple local rules. No orchestrator required.
 
-## Why This Matters
+Anthills brings this model to AI agents:
 
-- **Scalable:** Add more agents, they self-organize
-- **Resilient:** Agents fail independently, others adapt
-- **Simple:** Each agent is dumb; intelligence emerges
-- **Transparent:** You can see what agents are sensing/doing
+- Agents read from and write to a shared **Pheromone Board** — a persistent, observable environment
+- Coordination is **emergent**, not prescribed
+- Any agent can react to any signal — enabling flexible, parallel, self-organizing workflows
+- The full history of signals is captured as a **ledger** — making agent behavior auditable and replayable
 
-## Install
+---
 
-**Via PyPI (recommended):**
+## Core Concepts
+
+| Concept | Description |
+|---------|-------------|
+| **Pheromone Board** | The shared environment all agents read from and write to |
+| **Pheromone** | A signal deposited by an agent — carries type, intensity, payload, and TTL |
+| **Worker** | An agent that reacts to pheromones and may deposit new ones |
+| **Trail** | A sequence of pheromone deposits that form an emergent task path |
+| **Colony** | A named group of workers sharing a pheromone board |
+| **Ledger** | Append-only log of all pheromone events — the source of truth for tracing |
+
+---
+
+## Installation
 
 ```bash
 pip install anthills
 ```
 
-**From source:**
-
+For Claude integration:
 ```bash
-git clone https://github.com/dbrasuell/anthills
-cd anthills
-pip install -e .
+pip install anthills[claude]
 ```
+
+---
 
 ## Quick Start
 
-```bash
-export ANTHROPIC_API_KEY="sk-..."
-python -m examples.research_agents
+```python
+from anthills import Colony, Pheromone
+
+# Define a colony (shared environment)
+colony = Colony(name="research-pipeline")
+
+# Define workers that react to signals
+@colony.worker(reacts_to="task.created")
+async def researcher(pheromone, board):
+    # Process the pheromone
+    result = f"Researched: {pheromone.payload['topic']}"
+    # Deposit a new signal for other workers
+    board.deposit(Pheromone(
+        type="research.complete",
+        payload={"findings": result},
+        deposited_by="researcher",
+    ))
+
+@colony.worker(reacts_to="research.complete")
+async def summarizer(pheromone, board):
+    summary = f"Summary of: {pheromone.payload['findings']}"
+    board.deposit(Pheromone(
+        type="summary.ready",
+        payload={"summary": summary},
+        deposited_by="summarizer",
+    ))
+
+# Kick off the colony with an initial signal
+colony.deposit(type="task.created", payload={"topic": "quantum computing"})
+colony.run()
 ```
 
-Or run the T1D simulation:
+No graph definition. No router. Workers emerge into action as signals appear.
 
-```bash
-python -m examples.t1d_simulation
-```
+---
 
-## How It Works
-
-### The Pheromone Board
-
-Shared memory where agents leave traces:
+## With Claude (LLM Integration)
 
 ```python
-from anthills import PheromoneBoard
+from anthills import Colony
+from anthills.integrations.claude import ClaudeWorker
 
-board = PheromoneBoard()
-board.deposit("research", {
-    "topic": "LLM reasoning",
-    "findings": ["extended thinking works", "costs are high"],
-    "source": "agent_research"
-})
+colony = Colony(name="research")
+
+@colony.worker(reacts_to="topic.queued")
+class Researcher(ClaudeWorker):
+    system_prompt = "You are a research assistant."
+    output_pheromone_type = "research.complete"
+
+    async def build_messages(self, pheromone):
+        return [{"role": "user", "content": f"Summarize: {pheromone.payload['topic']}"}]
+
+colony.deposit(type="topic.queued", payload={"topic": "stigmergy"})
+colony.run()
 ```
 
-### Agent Loop
+---
 
-```python
-from anthills import Agent
+## Why Stigmergy?
 
-agent = Agent(name="researcher", goal="Research X", pheromone_board=board)
-while not agent.completed:
-    agent.step()  # perceive → think → act → deposit
-```
+Traditional agent orchestration is **choreography** — someone writes the script.
 
-### Example: Two Agents, No Explicit Messaging
+Stigmergy is **emergence** — the environment carries the coordination logic.
 
-**Agent A (Researcher):**
-- Reads pheromone board
-- Thinks: "I should research X"
-- Acts: calls web_search
-- Deposits: "Found 3 papers"
+This makes Anthills particularly well-suited for:
 
-**Agent B (Synthesizer):**
-- Reads pheromone board
-- Senses A's deposit: "3 papers found"
-- Thinks: "I should synthesize these"
-- Acts: calls code_exec to process
-- Deposits: "Synthesis complete"
+- **Long-running, async workflows** where tasks arrive unpredictably
+- **Parallel multi-agent pipelines** where bottlenecks are hard to predict upfront
+- **Adaptive systems** that need to self-organize around failures or new inputs
+- **Observable AI workflows** where you need to understand *why* agents did what they did
 
-No message passing. No protocol. Just traces in the environment.
+---
 
 ## Examples
 
-- **`research_agents.py`** — Two agents researching a topic together
-- **`t1d_simulation.py`** — Type 1 Diabetes pathophysiology model
-- **`debug_agents.py`** — Three agents debugging code collaboratively
-- **`build_agents.py`** — Agents building a feature end-to-end
+See the `examples/` directory:
 
-See `examples/` directory and `examples/T1D_README.md` for details.
+- **`research_agents.py`** — Multi-agent research pipeline
+- **`t1d_simulation.py`** — Type 1 Diabetes pathophysiology model (stigmergy in biology!)
 
-## Real-World Application: Type 1 Diabetes Simulation
+---
 
-**[NEW]** Anthills models the multi-agent dynamics of Type 1 Diabetes.
-
-### The Biology
-
-T1D emerges from anthills-like coordination failure:
-
-```
-BetaCells ↔ ImmuneSystem (no direct messaging)
-     ↓ (sense pheromones)
-  Glucose, Insulin, Cytokines, Antigens
-     ↑
-  Local responses → Emergent autoimmunity
-```
-
-1. **Genetic predisposition** — HLA genes increase autoimmune risk
-2. **Environmental trigger** — Viral infection breaks tolerance
-3. **Beta cell autoimmunity** — Immune attacks insulin-producing cells (no central controller)
-4. **Positive feedback** — Cell death → more inflammation → more attack
-5. **Clinical T1D** — ~80% beta cell loss → insulin-dependent diabetes
-
-### Run the Simulation
+## Development
 
 ```bash
-python -m examples.t1d_simulation
+git clone https://github.com/t1dm-ai/anthills
+cd anthills
+pip install -e ".[dev,claude]"
+pytest
 ```
 
-This runs two scenarios:
-- **High-risk**: Genetic predisposition + viral trigger → Fast T1D onset
-- **Low-risk**: Genetic resistance, no trigger → Slower/no progression
+---
 
-The output shows day-by-day progression of glucose, insulin, inflammation, and beta cell count.
+## Connectors
 
-See `examples/T1D_README.md` for full details.
+Connectors provide external tool integrations for your workers:
+
+```python
+from anthills import Colony
+from anthills.connectors import ConnectorRegistry, requires
+from anthills.connectors.gmail import GmailConnector
+from anthills.connectors.slack import SlackConnector
+
+# Create registry with configured connectors
+registry = ConnectorRegistry()
+registry.register(GmailConnector(credentials_path="/path/to/creds.json"))
+registry.register(SlackConnector(bot_token="xoxb-..."))
+
+# Create colony with connectors
+colony = Colony(name="notifications", connectors=registry)
+
+# Workers declare their connector requirements
+@colony.worker(reacts_to="alert.triggered", requires=["gmail", "slack"])
+async def notify(ctx):
+    gmail = ctx.connectors["gmail"]
+    slack = ctx.connectors["slack"]
+    
+    await gmail.send_email(to="team@example.com", subject="Alert", body="...")
+    await slack.send_message(channel="#alerts", text="...")
+```
+
+### Built-in Connectors
+
+| Connector | Install | Description |
+|-----------|---------|-------------|
+| `GmailConnector` | `pip install anthills[gmail]` | Send emails via Gmail API |
+| `SlackConnector` | `pip install anthills[slack]` | Post messages to Slack |
+
+### Custom Connectors
+
+```python
+from anthills.connectors import Connector, ConnectorConfig
+
+class MyConnector(Connector):
+    name = "my_service"
+    
+    async def connect(self) -> None:
+        # Initialize connection
+        pass
+    
+    async def disconnect(self) -> None:
+        # Cleanup
+        pass
+```
+
+---
+
+## Colony Templates
+
+Templates provide declarative, reusable colony configurations:
+
+```python
+from anthills.templates import TemplateCatalog, TemplateInstantiator
+
+# Discover built-in templates
+catalog = TemplateCatalog()
+catalog.register_builtins()
+
+# List available templates
+for template in catalog.list():
+    print(f"{template.name}: {template.description}")
+
+# Instantiate a template with parameters
+instantiator = TemplateInstantiator(catalog)
+colony = instantiator.instantiate(
+    "research_assistant",
+    parameters={
+        "research_depth": "comprehensive",
+        "output_format": "markdown"
+    }
+)
+
+colony.run()
+```
+
+### Built-in Templates
+
+| Template | Description |
+|----------|-------------|
+| `customer_inquiry_responder` | Auto-respond to customer questions |
+| `weekly_sales_summary` | Aggregate and report weekly sales data |
+| `research_assistant` | Multi-step research with Claude |
+
+### Custom Templates
+
+```python
+from anthills.templates import ColonyTemplate, WorkerSpec, TriggerSpec
+
+template = ColonyTemplate(
+    name="my_pipeline",
+    description="Custom processing pipeline",
+    workers=[
+        WorkerSpec(
+            name="processor",
+            reacts_to="input.received",
+            handler="my_module:process_handler",
+            emits=["output.ready"]
+        )
+    ],
+    triggers=[
+        TriggerSpec(type="input.received", payload={"source": "api"})
+    ]
+)
+```
+
+---
 
 ## Project Structure
 
 ```
 anthills/
-├── README.md
-├── pyproject.toml
-├── anthills/
-│   ├── __init__.py
-│   ├── agent.py              # Base Agent class
-│   ├── pheromone.py          # Shared environment
-│   ├── tools.py              # Tool definitions
-│   ├── llm.py                # Claude integration
-│   └── environments/
-│       ├── __init__.py
-│       └── t1d.py            # T1D simulation
-├── examples/
-│   ├── research_agents.py
-│   ├── t1d_simulation.py
-│   ├── debug_agents.py
-│   └── T1D_README.md
-└── tests/
-    └── test_pheromone.py
+├── board.py              # Event-sourced PheromoneBoard with wildcard patterns
+├── worker.py             # Worker base class with retry & concurrency control
+├── colony.py             # Colony runner (async event loop, auto-halt)
+├── connectors/           # External tool integrations
+│   ├── base.py           # Connector, ConnectorConfig, ConnectorRegistry
+│   ├── registry.py       # Registry and requires() helper
+│   ├── gmail/            # Gmail connector (optional)
+│   └── slack/            # Slack connector (optional)
+├── templates/            # Declarative colony configurations
+│   ├── base.py           # ColonyTemplate, WorkerSpec, TriggerSpec
+│   ├── catalog.py        # TemplateCatalog for discovery
+│   ├── instantiator.py   # Convert templates to runnable colonies
+│   └── builtins.py       # Built-in template definitions
+└── integrations/
+    └── claude.py         # ClaudeWorker, LLMWorker, ClaudeToolWorker
 ```
+
+---
 
 ## Philosophy
 
@@ -184,13 +295,17 @@ Use it when you want:
 
 ## Roadmap
 
+- [x] Event-sourced pheromone board with ledger
+- [x] Wildcard pattern matching for pheromone types
+- [x] Parallel agent execution with concurrency control
+- [x] Connector abstraction for external tools
+- [x] Colony templates for reusable configurations
+- [x] Claude/LLM integration
 - [ ] Real-time dashboard (visualize pheromone board)
 - [ ] Agent profiler (performance metrics)
 - [ ] Trace debugger (replay decisions step-by-step)
-- [ ] More environments (stock market, code debugging, research)
-- [ ] Parallel agent execution
-- [ ] Browser automation tools
-- [ ] Database access tools
+- [ ] Redis-backed board for distributed colonies
+- [ ] More connectors (GitHub, Jira, databases)
 - [ ] Webhooks / external event triggers
 
 ## Building This in Public
